@@ -1,79 +1,153 @@
-import datetime
+"""Test forcing data for WFLOW."""
+
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
-import xarray as xr
-from esmvalcore.experimental import Recipe
+from esmvalcore.experimental.recipe import Recipe
 from esmvalcore.experimental.recipe_info import RecipeInfo
 from esmvalcore.experimental.recipe_output import RecipeOutput
 
 from ewatercycle.base.forcing import FORCING_YAML
-from ewatercycle_hype.forcing import HypeForcing, build_hype_recipe
-from ewatercycle.testing.helpers import reyamlify
-
-
-def create_txt(path: Path, var_name: str) -> Path:
-    fn = path / f"{var_name}.txt"
-    # Some dummy data shaped as the model expects it
-    lines = [
-        "DATE 300730 300822",
-        "1990-01-01 -0.943 -2.442",
-        "1990-01-02 -0.308 -0.868",
-    ]
-    fn.write_text("\n".join(lines))
-    return fn
+from ewatercycle_wflow.forcing import WflowForcing, build_wflow_recipe
+from ewatercycle.testing.helpers import create_netcdf, reyamlify
 
 
 @pytest.fixture
 def mock_recipe_run(monkeypatch, tmp_path):
-    """Mock the `run` method on esmvalcore Recipe's."""
-    recorder = {}
+    """Overload the `run` method on esmvalcore Recipe's."""
+    data = {}
 
     dummy_recipe_output = RecipeOutput(
         {
             "diagnostic/script": {
-                create_txt(tmp_path, "Tobs"): {},
-                create_txt(tmp_path, "TMINobs"): {},
-                create_txt(tmp_path, "TMAXobs"): {},
-                create_txt(tmp_path, "Pobs"): {},
+                # create_netcdf() writes single variable while
+                # actual implementation writes multiple variables
+                create_netcdf("pr", tmp_path / "wflow_forcing.nc"): {},
             }
         },
         info=RecipeInfo({"diagnostics": {"diagnostic": {}}}, "script"),
     )
 
     def mock_run(self, session=None):
-        """Record run arguments for inspection and return dummy output."""
-        nonlocal recorder
-        recorder["session"] = session
+        """Store recipe for inspection and return dummy output."""
+        nonlocal data
+        data["data_during_run"] = self.data
+        data["session"] = session
         return dummy_recipe_output
 
     monkeypatch.setattr(Recipe, "run", mock_run)
-    return recorder
+    return data
 
 
-class TestGenerate:
+class TestGenerateWithExtractRegion:
+    @pytest.fixture
+    def reference_recipe(self):
+        return {
+            "diagnostics": {
+                "wflow_daily": {
+                    "additional_datasets": [
+                        {
+                            "dataset": "ERA5",
+                            "project": "OBS6",
+                            "tier": 3,
+                            "type": "reanaly",
+                            "version": 1,
+                        }
+                    ],
+                    "description": "WFlow input preprocessor for " "daily data",
+                    "scripts": {
+                        "script": {
+                            "basin": "Rhine",
+                            "dem_file": "wflow_parameterset/meuse/staticmaps/wflow_dem.map",  # noqa: E501
+                            "regrid": "area_weighted",
+                            "script": "hydrology/wflow.py",
+                        }
+                    },
+                    "variables": {
+                        "orog": {"mip": "fx", "preprocessor": "rough_cutout"},
+                        "pr": {
+                            "end_year": 1999,
+                            "mip": "day",
+                            "preprocessor": "rough_cutout",
+                            "start_year": 1989,
+                        },
+                        "psl": {
+                            "end_year": 1999,
+                            "mip": "day",
+                            "preprocessor": "rough_cutout",
+                            "start_year": 1989,
+                        },
+                        "rsds": {
+                            "end_year": 1999,
+                            "mip": "day",
+                            "preprocessor": "rough_cutout",
+                            "start_year": 1989,
+                        },
+                        "rsdt": {
+                            "end_year": 1999,
+                            "mip": "CFday",
+                            "preprocessor": "rough_cutout",
+                            "start_year": 1989,
+                        },
+                        "tas": {
+                            "end_year": 1999,
+                            "mip": "day",
+                            "preprocessor": "rough_cutout",
+                            "start_year": 1989,
+                        },
+                    },
+                }
+            },
+            "documentation": {
+                "authors": [
+                    "kalverla_peter",
+                    "camphuijsen_jaro",
+                    "alidoost_sarah",
+                    "aerts_jerom",
+                    "andela_bouwe",
+                ],
+                "maintainer": ["unmaintained"],
+                "description": "Pre-processes climate data for the WFlow hydrological model.\n",  # noqa: E501
+                "projects": ["ewatercycle"],
+                "references": ["acknow_project"],
+                "title": "Generate forcing for the WFlow hydrological model",
+            },
+            "preprocessors": {
+                "rough_cutout": {
+                    "extract_region": {
+                        "end_latitude": 2.5,
+                        "end_longitude": 16.75,
+                        "start_latitude": 7.25,
+                        "start_longitude": 10,
+                    }
+                }
+            },
+        }
+
     @pytest.fixture
     def forcing(self, mock_recipe_run, sample_shape):
-        # The recipe needs a compose shapefile, but the sample shape is not composed.
-        # That is OK because we mock the recipe run
-        return HypeForcing.generate(
+        return WflowForcing.generate(
             dataset="ERA5",
             start_time="1989-01-02T00:00:00Z",
             end_time="1999-01-02T00:00:00Z",
             shape=sample_shape,
+            dem_file="wflow_parameterset/meuse/staticmaps/wflow_dem.map",
+            extract_region={
+                "start_longitude": 10,
+                "end_longitude": 16.75,
+                "start_latitude": 7.25,
+                "end_latitude": 2.5,
+            },
         )
 
     def test_result(self, forcing, tmp_path, sample_shape):
-        expected = HypeForcing(
+        expected = WflowForcing(
             directory=str(tmp_path),
             start_time="1989-01-02T00:00:00Z",
             end_time="1999-01-02T00:00:00Z",
             shape=str(sample_shape),
-            Pobs="Pobs.txt",
-            TMAXobs="TMAXobs.txt",
-            TMINobs="TMINobs.txt",
-            Tobs="Tobs.txt",
+            netcdfinput="wflow_forcing.nc",
         )
         assert forcing == expected
 
@@ -84,91 +158,95 @@ class TestGenerate:
             """\
         start_time: '1989-01-02T00:00:00Z'
         end_time: '1999-01-02T00:00:00Z'
-        Pobs: Pobs.txt
-        TMAXobs: TMAXobs.txt
-        TMINobs: TMINobs.txt
-        Tobs: Tobs.txt
+        netcdfinput: wflow_forcing.nc
+        Precipitation: /pr
+        EvapoTranspiration: /pet
+        Temperature: /tas
         """
         )
 
         assert saved_forcing == expected
 
-    def test_saved_yaml_by_loading(self, forcing, tmp_path):
-        saved_forcing = HypeForcing.load(tmp_path)
+    def test_saved_yaml(self, forcing, tmp_path):
+        saved_forcing = WflowForcing.load(tmp_path)
         # shape should is not included in the yaml file
         forcing.shape = None
 
         assert forcing == saved_forcing
 
-    def test_to_xarray(self, forcing):
-        ds = forcing.to_xarray()
-
-        expected = xr.Dataset(
-            data_vars={
-                "Pobs": (
-                    ("time", "subbasin"),
-                    [[-0.943, -2.442], [-0.308, -0.868]],
-                ),
-                "TMAXobs": (
-                    ("time", "subbasin"),
-                    [[-0.943, -2.442], [-0.308, -0.868]],
-                ),
-                "TMINobs": (
-                    ("time", "subbasin"),
-                    [[-0.943, -2.442], [-0.308, -0.868]],
-                ),
-                "Tobs": (
-                    ("time", "subbasin"),
-                    [[-0.943, -2.442], [-0.308, -0.868]],
-                ),
-            },
-            coords={
-                "time": (
-                    ("time",),
-                    [
-                        datetime.datetime(1990, 1, 1, 0, 0),
-                        datetime.datetime(1990, 1, 2, 0, 0),
-                    ],
-                ),
-                "subbasin": (("subbasin",), [300730, 300822]),
-            },
-            attrs={
-                "title": "Hype forcing data",
-                "history": "Created by ewatercycle.plugins.hype.forcing.HypeForcing.to_xarray()",
-            },
+    def test_str(self, forcing, tmp_path, sample_shape):
+        result = str(forcing)
+        expected = "".join(
+            [
+                "start_time='1989-01-02T00:00:00Z' end_time='1999-01-02T00:00:00Z' ",
+                f"directory={repr(tmp_path)} shape={repr(Path(sample_shape))} ",
+                "netcdfinput='wflow_forcing.nc' Precipitation='/pr' ",
+                "EvapoTranspiration='/pet' Temperature='/tas' Inflow=None",
+            ]
         )
-
-        xr.testing.assert_equal(ds, expected)
+        assert result == expected
 
 
 def test_with_directory(mock_recipe_run, sample_shape, tmp_path):
     forcing_dir = tmp_path / "myforcing"
-    HypeForcing.generate(
+    WflowForcing.generate(
         dataset="ERA5",
         start_time="1989-01-02T00:00:00Z",
         end_time="1999-01-02T00:00:00Z",
-        shape=str(sample_shape),
+        shape=sample_shape,
         directory=forcing_dir,
+        dem_file="wflow_parameterset/meuse/staticmaps/wflow_dem.map",
+        extract_region={
+            "start_longitude": 10,
+            "end_longitude": 16.75,
+            "start_latitude": 7.25,
+            "end_latitude": 2.5,
+        },
     )
 
     assert mock_recipe_run["session"].session_dir == forcing_dir
 
 
-def test_build_hype_recipe(sample_shape: str):
-    recipe = build_hype_recipe(
+def test_load_legacy_forcing(tmp_path):
+    (tmp_path / FORCING_YAML).write_text(
+        """\
+        !WflowForcing
+        start_time: '1989-01-02T00:00:00Z'
+        end_time: '1999-01-02T00:00:00Z'
+        netcdfinput: inmaps.nc
+        Precipitation: /pr
+        EvapoTranspiration: /pet
+        Temperature: /tas
+    """
+    )
+
+    expected = WflowForcing(
+        start_time="1989-01-02T00:00:00Z",
+        end_time="1999-01-02T00:00:00Z",
+        directory=tmp_path,
+    )
+
+    result = WflowForcing.load(tmp_path)
+
+    assert result == expected
+
+
+def test_build_wflow_recipe(sample_shape: str):
+    recipe = build_wflow_recipe(
         dataset="ERA5",
         start_year=1990,
         end_year=2001,
         shape=Path(sample_shape),
+        dem_file="wflow_parameterset/meuse/staticmaps/wflow_dem.map",
     )
     recipe_as_string = recipe.to_yaml()
 
     # Should look similar to
-    # https://github.com/ESMValGroup/ESMValTool/blob/main/esmvaltool/recipes/hydrology/recipe_hype.yml
+    # https://github.com/ESMValGroup/ESMValTool/blob/main/esmvaltool/recipes/hydrology/recipe_wflow.yml
     expected = dedent(
         f"""\
 documentation:
-  title: Hype forcing data
+  title: Generate forcing for the WFlow hydrological model
   description: ''
   authors:
   - unmaintained
@@ -182,74 +260,84 @@ datasets:
   version: 1
 preprocessors:
   spatial:
-    extract_shape:
-      shapefile: {sample_shape}
-      crop: true
-      decomposed: true
-    area_statistics:
-      operator: mean
+    extract_region:
+      start_longitude: 1.1
+      end_longitude: 14.9
+      start_latitude: 43.3
+      end_latitude: 55.2
   tas:
-    extract_shape:
-      shapefile: {sample_shape}
-      crop: true
-      decomposed: true
-    area_statistics:
-      operator: mean
-    convert_units:
-      units: degC
-  tasmin:
-    extract_shape:
-      shapefile: {sample_shape}
-      crop: true
-      decomposed: true
-    area_statistics:
-      operator: mean
-    convert_units:
-      units: degC
-  tasmax:
-    extract_shape:
-      shapefile: {sample_shape}
-      crop: true
-      decomposed: true
-    area_statistics:
-      operator: mean
-    convert_units:
-      units: degC
+    extract_region:
+      start_longitude: 1.1
+      end_longitude: 14.9
+      start_latitude: 43.3
+      end_latitude: 55.2
   pr:
-    extract_shape:
-      shapefile: {sample_shape}
-      crop: true
-      decomposed: true
-    area_statistics:
-      operator: mean
-    convert_units:
-      units: kg m-2 d-1
+    extract_region:
+      start_longitude: 1.1
+      end_longitude: 14.9
+      start_latitude: 43.3
+      end_latitude: 55.2
+  psl:
+    extract_region:
+      start_longitude: 1.1
+      end_longitude: 14.9
+      start_latitude: 43.3
+      end_latitude: 55.2
+  rsds:
+    extract_region:
+      start_longitude: 1.1
+      end_longitude: 14.9
+      start_latitude: 43.3
+      end_latitude: 55.2
+  orog:
+    extract_region:
+      start_longitude: 1.1
+      end_longitude: 14.9
+      start_latitude: 43.3
+      end_latitude: 55.2
+  rsdt:
+    extract_region:
+      start_longitude: 1.1
+      end_longitude: 14.9
+      start_latitude: 43.3
+      end_latitude: 55.2
 diagnostics:
   diagnostic:
     scripts:
       script:
-        script: hydrology/hype.py
+        script: hydrology/wflow.py
+        basin: Rhine
+        dem_file: wflow_parameterset/meuse/staticmaps/wflow_dem.map
+        regrid: area_weighted
     variables:
       tas:
         start_year: 1990
         end_year: 2001
         mip: day
         preprocessor: tas
-      tasmin:
-        start_year: 1990
-        end_year: 2001
-        mip: day
-        preprocessor: tasmin
-      tasmax:
-        start_year: 1990
-        end_year: 2001
-        mip: day
-        preprocessor: tasmax
       pr:
         start_year: 1990
         end_year: 2001
         mip: day
         preprocessor: pr
+      psl:
+        start_year: 1990
+        end_year: 2001
+        mip: day
+        preprocessor: psl
+      rsds:
+        start_year: 1990
+        end_year: 2001
+        mip: day
+        preprocessor: rsds
+      orog:
+        mip: fx
+        preprocessor: orog
+      rsdt:
+        start_year: 1990
+        end_year: 2001
+        mip: CFday
+        preprocessor: rsdt
         """
     )
     assert recipe_as_string == reyamlify(expected)

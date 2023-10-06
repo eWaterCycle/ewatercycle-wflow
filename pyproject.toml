@@ -3,11 +3,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "src/ewatercycle_hype/__init__.py"
+path = "src/ewatercycle_wflow/__init__.py"
 
 [project]
-name = "ewatercycle-hype"
-description = "eWaterCycle plugin for HYPE hydrological model"
+name = "ewatercycle-wflow"
+description = "eWaterCycle plugin for wflow hydrological model"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
@@ -31,6 +31,8 @@ dynamic = ["version"]
 
 # This registers the plugin such that it is discoverable by eWaterCycle
 [project.entry-points."ewatercycle.models"]
-Hype = "ewatercycle_hype.model:Hype"
+Wflow = "ewatercycle_wflow.model:Wflow"
 [project.entry-points."ewatercycle.forcings"]
-HypeForcing = "ewatercycle_hype.forcing:HypeForcing"
+WflowForcing = "ewatercycle_wflow.forcing:WflowForcing"
+[project.entry-points."ewatercycle.parameter_sets"]
+wflow_rhine_sbm_nc = "ewatercycle_wflow.parameter_sets:wflow_rhine_sbm_nc"

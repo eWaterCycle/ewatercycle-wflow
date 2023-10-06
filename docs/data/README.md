@@ -1,3 +1,3 @@
 # Sources
 
-Rhine_HYPE/ directory was extracted from tarball from https://github.com/eWaterCycle/recipes_auxiliary_datasets/tree/master/hype/shapefiles
+* <wflow_dem.map> downloaded from https://github.com/openstreams/wflow/blob/master/examples/wflow_rhine_sbm2/staticmaps/wflow_dem.map
