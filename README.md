@@ -1,6 +1,8 @@
 # eWaterCycle plugin for wflow hydrological model
 
 [![Research Software Directory Badge](https://img.shields.io/badge/rsd-00a3e3.svg)](https://www.research-software.nl/software/ewatercycle-wflow)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8420109.svg)](https://doi.org/10.5281/zenodo.8420109)
+[![PyPI](https://img.shields.io/pypi/v/ewatercycle-wflow)](https://pypi.org/project/ewatercycle-wflow/)
 
 wflow plugin for [eWatercycle](https://ewatercycle.readthedocs.io/).
 

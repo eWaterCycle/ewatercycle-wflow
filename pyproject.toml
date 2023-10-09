@@ -36,3 +36,6 @@ Wflow = "ewatercycle_wflow.model:Wflow"
 WflowForcing = "ewatercycle_wflow.forcing:WflowForcing"
 [project.entry-points."ewatercycle.parameter_sets"]
 wflow_rhine_sbm_nc = "ewatercycle_wflow.parameter_sets:wflow_rhine_sbm_nc"
+
+[project.urls]
+homepage = "https://github.com/eWaterCycle/ewatercycle-wflow/"
