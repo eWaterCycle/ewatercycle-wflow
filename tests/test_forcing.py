@@ -11,7 +11,7 @@ from esmvalcore.experimental.recipe_output import RecipeOutput
 from ewatercycle.base.forcing import FORCING_YAML
 from ewatercycle_wflow.forcing import WflowForcing, build_wflow_recipe
 from ewatercycle.testing.helpers import create_netcdf, reyamlify
-
+from ewatercycle_wflow import forcing_diagnostic_script
 
 @pytest.fixture
 def mock_recipe_run(monkeypatch, tmp_path):
@@ -61,7 +61,7 @@ class TestGenerateWithExtractRegion:
                             "basin": "Rhine",
                             "dem_file": "wflow_parameterset/meuse/staticmaps/wflow_dem.map",  # noqa: E501
                             "regrid": "area_weighted",
-                            "script": "hydrology/wflow.py",
+                            "script": str(Path(forcing_diagnostic_script.__file__).absolute()),
                         }
                     },
                     "variables": {
@@ -305,7 +305,7 @@ diagnostics:
   diagnostic:
     scripts:
       script:
-        script: hydrology/wflow.py
+        script: {Path(forcing_diagnostic_script.__file__).absolute()}
         basin: Rhine
         dem_file: wflow_parameterset/meuse/staticmaps/wflow_dem.map
         regrid: area_weighted
