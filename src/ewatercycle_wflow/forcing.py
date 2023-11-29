@@ -151,7 +151,7 @@ def build_wflow_recipe(
         .add_variable("orog", mip="fx", start_year=False, end_year=False)
         .add_variable("rsdt", mip="CFday")
         .script(
-            "hydrology/wflow.py",
+            str((Path(__file__).parent / "forcing_diagnostic_script.py").absolute()), 
             {
                 "basin": shape.stem,
                 "dem_file": dem_file,
