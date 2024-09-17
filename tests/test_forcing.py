@@ -158,6 +158,8 @@ class TestGenerateWithExtractRegion:
             """\
         start_time: '1989-01-02T00:00:00Z'
         end_time: '1999-01-02T00:00:00Z'
+        shape: Rhine.shp
+        filenames: {}
         netcdfinput: wflow_forcing.nc
         Precipitation: /pr
         EvapoTranspiration: /pet
@@ -169,8 +171,7 @@ class TestGenerateWithExtractRegion:
 
     def test_saved_yaml(self, forcing, tmp_path):
         saved_forcing = WflowForcing.load(tmp_path)
-        # shape should is not included in the yaml file
-        forcing.shape = None
+        forcing.shape = forcing.directory / "Rhine.shp"
 
         assert forcing == saved_forcing
 
@@ -180,6 +181,7 @@ class TestGenerateWithExtractRegion:
             [
                 "start_time='1989-01-02T00:00:00Z' end_time='1999-01-02T00:00:00Z' ",
                 f"directory={repr(tmp_path)} shape={repr(Path(sample_shape))} ",
+                "filenames={} "
                 "netcdfinput='wflow_forcing.nc' Precipitation='/pr' ",
                 "EvapoTranspiration='/pet' Temperature='/tas' Inflow=None",
             ]
