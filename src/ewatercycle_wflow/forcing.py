@@ -28,9 +28,8 @@ class WflowForcing(DefaultForcing):
         Inflow (str) = None: Variable name of inflow data in input file.
     """
 
-    filenames: dict[str, str] = {}
     netcdfinput: str = "inmaps.nc"
-    Precipitation: str = "/pr"  # noqa: N803
+    Precipitation: str = "/pr"
     EvapoTranspiration: str = "/pet"
     Temperature: str = "/tas"
     Inflow: Optional[str] = None
