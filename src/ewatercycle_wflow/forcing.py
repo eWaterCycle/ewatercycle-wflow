@@ -29,7 +29,7 @@ class WflowForcing(DefaultForcing):
     """
 
     netcdfinput: str = "inmaps.nc"
-    Precipitation: str = "/pr"  # noqa: N803
+    Precipitation: str = "/pr"
     EvapoTranspiration: str = "/pet"
     Temperature: str = "/tas"
     Inflow: Optional[str] = None
